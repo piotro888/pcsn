@@ -1,0 +1,10 @@
+[package]
+name = "pcsn"
+version = "0.1.0"
+edition = "2021"
+authors = ["Piotr Wegrzyn"]
+description = "PCPU Simulator"
+license = "MIT"
+
+[dependencies]
+lazy_static = "1.4.0"
