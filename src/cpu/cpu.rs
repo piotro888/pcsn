@@ -1,3 +1,5 @@
+use crate::cpu::sreg::SregCoreState;
+
 pub struct State {
     pub reg: [u16; 8],
     pub pc: u16,
@@ -5,5 +7,6 @@ pub struct State {
 }
 
 pub struct CPU {
-    state: State
+    state: State,
+    stregs: SregCoreState
 }
