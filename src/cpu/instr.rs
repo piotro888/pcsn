@@ -21,7 +21,16 @@ impl Encoding {
 #[repr(u8)]
 enum Opcode {
     NOP = 0,
-    ADD = 2,
+    ADD = 7,
+    AND = 13,
+    ORR = 14,
+    XOR = 15,
+    ANI = 16,
+    ORI = 17,
+    XOI = 18,
+    SHL = 19,
+    SHR = 20,
+    
 }
 
 struct Operation {
@@ -47,6 +56,71 @@ lazy_static! {
             },
             repr: |enc| format!("add r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
         });
+        m.insert(Opcode::AND as u8, Operation {
+            execute: |enc, state | {
+                state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] & state.reg[enc.rs2 as usize];
+                state.pc = state.pc+1;
+            },
+            repr: |enc| format!("and r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::ORR as u8, Operation {
+        execute: |enc, state | {
+            state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] | state.reg[enc.rs2 as usize];
+            state.pc = state.pc+1;
+            },
+            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+       m.insert(Opcode::XOR as u8, Operation {
+            execute: |enc, state | {
+                state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] ^ state.reg[enc.rs2 as usize];
+                state.pc = state.pc+1;
+            },
+            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+       m.insert(Opcode::ANI as u8, Operation {
+            execute: |enc, state| {
+                state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] + state.reg[enc.imm as usize];
+                state.pc = state.pc+1;
+            },
+            repr: |enc| format!("add r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+       m.insert(Opcode::ORI as u8, Operation {
+        execute: |enc, state | {
+            state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] | state.reg[enc.imm as usize];
+            state.pc = state.pc+1;
+            },
+            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+       m.insert(Opcode::XOI as u8, Operation {
+        execute: |enc, state | {
+            state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] ^ state.reg[enc.imm as usize];
+            state.pc = state.pc+1;
+            },
+            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::XOI as u8, Operation {
+            execute: |enc, state | {
+                state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] ^ state.reg[enc.imm as usize];
+                state.pc = state.pc+1; 
+            },
+            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::SHL as u8, Operation {
+            execute: |enc, state | {
+                state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] << state.reg[enc.rs2 as usize];
+                state.pc = state.pc+1; 
+            },
+            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::SHR as u8, Operation {
+            execute: |enc, state | {
+                state.reg[enc.rd as usize] = state.reg[enc.rs1 as usize] >> state.reg[enc.rs2 as usize];
+                state.pc = state.pc+1; 
+            },
+            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+         
+  
 
         m
     };
