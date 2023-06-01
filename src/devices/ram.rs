@@ -21,7 +21,7 @@ impl Device for RAM {
 }
 
 impl RAM {
-    pub fn with_size(size: usize) -> RAM {
-        RAM { mem: vec![0; size].into_boxed_slice() } 
+    pub fn with_size(length: usize) -> RAM {
+        RAM { mem: vec![0; length].into_boxed_slice() }
     }
 }

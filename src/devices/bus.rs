@@ -18,10 +18,10 @@ impl Bus {
          self.devices.push(dev_ent);
     }
 
-    fn find_device(&mut self, addr: u32) -> Option<&mut dyn Device> {
+    fn find_device(&mut self, addr: u32) -> Option<&mut DeviceEntry> {
         for dev in &mut self.devices {
             if addr >= dev.begin_addr && addr <= dev.end_addr {
-                return Some(dev.device.as_mut())
+                return Some(dev)
             }
         }
         None
@@ -36,12 +36,11 @@ impl Device for Bus {
     fn read(&mut self, address: u32, sel: u8) -> u16 {
         let dev = self.find_device(address).unwrap(); // TODO: Support bus err respose in some
                                                       // cases and panic in others
-        dev.read(address, sel)
+        dev.device.read(address-dev.begin_addr, sel)
     }
     
     fn write(&mut self, address: u32, sel: u8, data: u16) {
         let dev = self.find_device(address).unwrap();
-        
-        dev.write(address, sel, data) 
+        dev.device.write(address-dev.begin_addr, sel, data)
     }
 }
