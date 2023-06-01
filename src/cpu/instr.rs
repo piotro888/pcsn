@@ -29,17 +29,23 @@ impl Encoding {
 #[derive(PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 enum Opcode {
-    NOP = 0,
-    LDD = 2,
-    ADD = 7,
-    AND = 13,
-    ORR = 14,
-    XOR = 15,
-    ANI = 16,
-    ORI = 17,
-    XOI = 18,
-    SHL = 19,
-    SHR = 20,
+    NOP = 0x0,
+    LDD = 0x2,
+    ADD = 0x7,
+    AND = 0x13,
+    ORR = 0x14,
+    XOR = 0x15,
+    ANI = 0x16,
+    ORI = 0x17,
+    XOI = 0x18,
+    SHL = 0x19,
+    SHR = 0x20,
+    SLI = 0x23,
+    SRI = 0x24,
+    DIV = 0x1D,
+    MUL = 0x1C,
+    MOD = 0x2C,
+
 }
 
 struct Operation {
@@ -86,56 +92,85 @@ lazy_static! {
             },
             repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
         });
-       m.insert(Opcode::XOR as u8, Operation {
+        m.insert(Opcode::XOR as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] ^ cpu.state.reg[enc.rs2 as usize];
                 cpu.state.pc = cpu.state.pc+1;
             },
-            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+            repr: |enc| format!("xor r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
         });
-       m.insert(Opcode::ANI as u8, Operation {
+        m.insert(Opcode::ANI as u8, Operation {
             execute: |enc, cpu| {
-                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] + cpu.state.reg[enc.imm as usize];
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] + enc.imm;
                 cpu.state.pc = cpu.state.pc+1;
             },
-            repr: |enc| format!("add r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+            repr: |enc| format!("ani r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
         });
-       m.insert(Opcode::ORI as u8, Operation {
+        m.insert(Opcode::ORI as u8, Operation {
         execute: |enc, cpu| {
-            cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] | cpu.state.reg[enc.imm as usize];
+            cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] | enc.imm;
             cpu.state.pc = cpu.state.pc+1;
             },
-            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
-        });
-       m.insert(Opcode::XOI as u8, Operation {
-        execute: |enc, cpu| {
-            cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] ^ cpu.state.reg[enc.imm as usize];
-            cpu.state.pc = cpu.state.pc+1;
-            },
-            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+            repr: |enc| format!("ori r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
         });
         m.insert(Opcode::XOI as u8, Operation {
-            execute: |enc, cpu| {
-                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] ^ cpu.state.reg[enc.imm as usize];
-                cpu.state.pc = cpu.state.pc+1; 
+        execute: |enc, cpu| {
+            cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] ^ enc.imm;
+            cpu.state.pc = cpu.state.pc+1;
             },
-            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+            repr: |enc| format!("xoi r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
         });
         m.insert(Opcode::SHL as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] << cpu.state.reg[enc.rs2 as usize];
                 cpu.state.pc = cpu.state.pc+1; 
             },
-            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+            repr: |enc| format!("shl r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
         });
         m.insert(Opcode::SHR as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] >> cpu.state.reg[enc.rs2 as usize];
                 cpu.state.pc = cpu.state.pc+1; 
             },
-            repr: |enc| format!("or r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+            repr: |enc| format!("shr r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
         });
-         
+        m.insert(Opcode::SLI as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] << enc.imm;
+                cpu.state.pc = cpu.state.pc+1; 
+            },
+            repr: |enc| format!("sli r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::SRI as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] >> enc.imm;
+                cpu.state.pc = cpu.state.pc+1; 
+            },
+            repr: |enc| format!("sri r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::DIV as u8, Operation {
+           execute: |enc, cpu| {
+               cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] / cpu.state.reg[enc.rs2 as usize];
+               cpu.state.pc = cpu.state.pc+1;
+           },
+           repr: |enc| format!("div r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::MUL as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] * cpu.state.reg[enc.rs2 as usize];
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("mul r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::MOD as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] % cpu.state.reg[enc.rs2 as usize];
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("mod r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+
+
         m
     };
 }

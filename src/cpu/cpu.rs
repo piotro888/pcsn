@@ -46,7 +46,8 @@ impl CPU {
     pub fn execute(&mut self, instr: u32) {
         let encoding = Encoding::from_raw(instr);
         execute(&encoding, self);
-    } 
+    }
+
 }
 
 impl CPU {
