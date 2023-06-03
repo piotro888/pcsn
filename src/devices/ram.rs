@@ -24,4 +24,18 @@ impl RAM {
     pub fn with_size(length: usize) -> RAM {
         RAM { mem: vec![0; length].into_boxed_slice() }
     }
+
+    pub fn load_at(&mut self, addr: u32, data: &[u8]) {
+        let mut le_data = vec![0; data.len()/2];
+        for (pos, ent) in le_data.iter_mut().enumerate() {
+            *ent = u16::from_le_bytes(data[pos*2..pos*2+1].try_into().unwrap())
+        }
+
+        self.mem[addr as usize..addr as usize+le_data.len()].copy_from_slice(&le_data);
+
+        if data.len() % 2 != 0 {
+            self.mem[addr as usize + le_data.len()] &= 0xff00;
+            self.mem[addr as usize + le_data.len()] |= *data.last().unwrap() as u16;
+        }
+    }
 }

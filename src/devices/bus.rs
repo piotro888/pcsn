@@ -41,6 +41,6 @@ impl Device for Bus {
     
     fn write(&mut self, address: u32, sel: u8, data: u16) {
         let dev = self.find_device(address).unwrap();
-        dev.device.write(address-dev.begin_addr, sel, data)
+        dev.device.write(address-dev.begin_addr, sel, data) 
     }
 }
