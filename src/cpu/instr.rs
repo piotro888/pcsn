@@ -1,6 +1,33 @@
 use crate::cpu::cpu::CPU;
+use bitflags::bitflags;
 
 use std::collections::HashMap;
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Flags: u16 {
+        const CLEAR_FLAG = 0;
+        const Z = (1 << 0); //zero
+        const C = (1 << 1); //cary
+        const N = (1 << 2); //negative
+        const O = (1 << 3); //overflow
+        const P = (1 << 4); //
+        //const ALLFLAGS = Self::Z.bits() | Self::C.bits() | Self::N.bits() | Self::O.bits() | Self::P.bits();
+    }
+}
+
+
+//impl Flags {
+    pub fn gen_flag(enc: &Encoding, cpu: &CPU) -> u16 {
+        let mut temp_flag = Flags::CLEAR_FLAG;
+        if cpu.state.reg[enc.rd as usize] == 0 { temp_flag |= Flags::Z; }
+        //TODO: rest of flags implementations here\   
+        
+        /*example debug:*/ //println!("{:?}", temp_flag);
+        temp_flag.bits()
+    }
+//}
+
 
 #[derive(Debug)]
 pub struct Encoding {
@@ -54,10 +81,11 @@ struct Operation {
 }
 
 
+
 lazy_static! {
     static ref OP_MAP : HashMap<u8, Operation> = {  
         let mut m = HashMap::new();
-
+        
         m.insert(Opcode::NOP as u8, Operation {
             execute: |_enc, cpu| {
                 cpu.state.pc = cpu.state.pc+1;
