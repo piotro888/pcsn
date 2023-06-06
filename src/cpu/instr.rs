@@ -1,5 +1,5 @@
 use crate::cpu::cpu::CPU;
-use bitflags::bitflags;
+use bitflags::{bitflags, Flag};
 
 use std::collections::HashMap;
 
@@ -11,23 +11,10 @@ bitflags! {
         const C = (1 << 1); //cary
         const N = (1 << 2); //negative
         const O = (1 << 3); //overflow
-        const P = (1 << 4); //
+        const P = (1 << 4); //parity
         //const ALLFLAGS = Self::Z.bits() | Self::C.bits() | Self::N.bits() | Self::O.bits() | Self::P.bits();
     }
 }
-
-
-//impl Flags {
-    pub fn gen_flag(enc: &Encoding, cpu: &CPU) -> u16 {
-        let mut temp_flag = Flags::CLEAR_FLAG;
-        if cpu.state.reg[enc.rd as usize] == 0 { temp_flag |= Flags::Z; }
-        //TODO: rest of flags implementations here\   
-        
-        /*example debug:*/ //println!("{:?}", temp_flag);
-        temp_flag.bits()
-    }
-//}
-
 
 #[derive(Debug)]
 pub struct Encoding {
@@ -57,8 +44,11 @@ impl Encoding {
 #[repr(u8)]
 enum Opcode {
     NOP = 0x0,
+    MOV = 0x1,
     LDD = 0x2,
     ADD = 0x7,
+    ADI = 0x8,
+    SUB = 0xA,
     AND = 0x13,
     ORR = 0x14,
     XOR = 0x15,
@@ -66,7 +56,7 @@ enum Opcode {
     ORI = 0x17,
     XOI = 0x18,
     SHL = 0x19,
-    SHR = 0x20,
+    SHR = 0x1A,
     SLI = 0x23,
     SRI = 0x24,
     DIV = 0x1D,
@@ -91,7 +81,13 @@ lazy_static! {
                 cpu.state.pc = cpu.state.pc+1;
             },
             repr: |_enc| String::from("nop"),
-        }); 
+        });
+        m.insert(Opcode::MOV as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize];
+            },
+            repr: |enc| format!("mov r{}, r{}", enc.rd, enc.rs1),
+        });
         m.insert(Opcode::LDD as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.read(enc.imm, true);
@@ -102,9 +98,24 @@ lazy_static! {
         m.insert(Opcode::ADD as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] + cpu.state.reg[enc.rs2 as usize];
+                //gen_flag(false, cpu.state.reg[enc.rs1 as usize], cpu.state.reg[enc.rs2 as usize], cpu.state.reg[enc.rd as usize])
                 cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("add r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::ADI as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] + enc.imm;
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("adi r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::SUB as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize] - cpu.state.reg[enc.rs2 as usize];
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("sub r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
         });
         m.insert(Opcode::AND as u8, Operation {
             execute: |enc, cpu| {
@@ -211,4 +222,45 @@ pub fn execute(enc: &Encoding, cpu: &mut CPU) {
     });
     
     (op.execute)(enc, cpu);
+}
+
+/*`
+pub fn gen_flag(enc: &Encoding, cpu: &CPU, v1: u8, v2: u8) -> u16 {
+    let mut temp_flag = Flags::CLEAR_FLAG;
+    if cpu.state.reg[enc.rd as usize] == 0 { temp_flag |= Flags::Z; }
+    //TODO: rest of flags implementations here
+    //if  sex2 == sex3 { goto jail; }
+//    if (enc.opcode == 0x7 || enc.opcode == Opcode::ADI ) && v1 as i8 + v2 as i8 != cpu.state.reg[enc.rd as usize] as u8 { temp_flag |= Flags::O; }  
+//
+ //   if enc.opcode == 0x7 && v1 + v2 != cpu.state.reg[enc.rd as usize] { temp_flag |= Flags::C; }
+    /*example debug:*/ //println!("{:?}", temp_flag);
+    temp_flag.bits()
+}
+*/
+
+
+fn gen_flag(is_subtract: bool, var_1: u32, var_2: u32, mut var_out: u32) -> u16 {
+    let mut temp_flag = Flags::CLEAR_FLAG;
+    if extract(var_out, 15, 1) == 1 { temp_flag |= Flags::N; }
+    
+    if extract(var_out, 16, 1) == 1 { temp_flag |= Flags::C; }
+
+    if is_subtract {
+        if (extract(var_1, 15, 1) ^ extract(var_2, 15, 1) ^ 1) & (extract(var_1, 15, 1) ^ extract(var_out, 15, 1)) == 1 { temp_flag |= Flags::O; }
+    }
+    else {
+        if (extract(var_1, 15, 1) ^ extract(var_2, 15, 1) ^ 0) & (extract(var_1, 15, 1) ^ extract(var_out, 15, 1)) == 1 { temp_flag |= Flags::O; }
+    }
+
+    if var_out as u16 == 0 { temp_flag |= Flags::Z; }
+
+    //bit magic
+    var_out ^= var_out >> 8;
+    var_out ^= var_out >> 4;
+    var_out ^= var_out >> 2;
+    var_out ^= var_out >> 1;
+    if extract(var_out, 0, 1) == 0 { temp_flag |= Flags::P; }
+
+    println!("{:?}", temp_flag);
+    temp_flag.bits()
 }
