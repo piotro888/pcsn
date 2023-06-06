@@ -1,5 +1,5 @@
 use crate::cpu::cpu::CPU;
-use bitflags::{bitflags, Flag};
+use bitflags::bitflags;
 
 use std::collections::HashMap;
 
@@ -13,6 +13,26 @@ bitflags! {
         const O = (1 << 3); //overflow
         const P = (1 << 4); //parity
     }
+}
+
+pub fn convert_to_bitflags(mut field: u16) -> Flags {
+    let mut temp_flag: Flags = Flags::CLEAR_FLAG;
+    if field & 0b1 == 1 { temp_flag |= Flags::Z; }
+    field = field >> 1;
+
+    if field & 0b1 == 1 { temp_flag |= Flags::C; }
+    field = field >> 1;
+
+    if field & 0b1 == 1 { temp_flag |= Flags::N; }
+    field = field >> 1;
+
+    if field & 0b1 == 1 { temp_flag |= Flags::O; }
+    field = field >> 1;
+
+    if field & 0b1 == 1 { temp_flag |= Flags::P; }
+    field = field >> 1;
+
+    return temp_flag;
 }
 
 #[derive(Debug)]
@@ -50,6 +70,7 @@ enum Opcode { /* "//" <- means ready */
     SUB = 0xA,//
     CMP = 0xC,//
     CMI = 0xD,//
+    JMP = 0xE,
     JAL = 0xF,//
     AND = 0x13,//
     ORR = 0x14,//
@@ -57,9 +78,9 @@ enum Opcode { /* "//" <- means ready */
     ANI = 0x16,//
     ORI = 0x17,//
     XOI = 0x18,//
-    SHL = 0x19,
+    SHL = 0x19,//
     SHR = 0x1A,//
-    SLI = 0x23,
+    SLI = 0x23,//
     SRI = 0x24,//
     DIV = 0x1D,
     MUL = 0x1C,
@@ -189,7 +210,7 @@ lazy_static! {
         });
         m.insert(Opcode::SHL as u8, Operation {
             execute: |enc, cpu| {
-                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 << cpu.state.reg[enc.rs2 as usize] as u32; //i have no fucking idea why this doesnt want to work,it's litteraly the same as other functions mijv6fi2j535f5r5gejihnegfboegoje9ef9nhef9e
+                let _out: u32 = ((cpu.state.reg[enc.rs1 as usize] as u32) << (cpu.state.reg[enc.rs2 as usize] as u32)); //i have no fucking idea why this doesnt want to work,it's litteraly the same as other functions mijv6fi2j535f5r5gejihnegfboegoje9ef9nhef9e
                 cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
 
@@ -209,7 +230,7 @@ lazy_static! {
         });
         m.insert(Opcode::SLI as u8, Operation {
             execute: |enc, cpu| {
-                let _out:u32 = cpu.state.reg[enc.rs1] as u32 << enc.imm as u32;
+                let _out: u32 = ((cpu.state.reg[enc.rs1 as usize] as u32) << (enc.imm as u32));
                 cpu.state.reg[enc.rd as usize] = _out as u16; // again wtf????
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
 
@@ -254,10 +275,10 @@ lazy_static! {
             },
             repr: |enc| format!("cmp r{}, r{}", enc.rs1, enc.rs2),
         });
-        m.insert(Opcode::CMP as u8, Operation {
+        m.insert(Opcode::CMI as u8, Operation {
             execute: |enc, cpu| {
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 - enc.imm as u32;
-                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs1 as usize] as u32, _out) // not sure what to pass here
+                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
             },
             repr: |enc| format!("cmp r{}, {}", enc.rs1, enc.imm),
         });
@@ -266,9 +287,37 @@ lazy_static! {
                 cpu.state.reg[enc.rd as usize] = cpu.state.pc;
                 cpu.state.pc = enc.imm; 
             },
-            repr: |enc| format!("jal"), //probably should be better
+            repr: |enc| format!("jal {}", enc.imm), //probably should be better
         });
+        m.insert(Opcode::JMP as u8, Operation {
+            execute: |enc, cpu| {
+                let jmp_code: u8 = ((enc.rs1 << 3) as u8) +  enc.rd as u8;
+                let cpu_flags: Flags = convert_to_bitflags(cpu.state.flags);
 
+                match jmp_code {
+                    0x0 => cpu.state.pc = enc.imm,
+                    0x1 => if cpu_flags & Flags::C == Flags::C { cpu.state.pc = enc.imm},
+                    0x2 => if cpu_flags & Flags::Z == Flags::Z { cpu.state.pc = enc.imm},
+                    0x3 => if cpu_flags & Flags::N == Flags::N { cpu.state.pc = enc.imm},
+                    0x4 => if cpu_flags & (Flags::N | Flags::Z) != (Flags::N | Flags::Z) { cpu.state.pc = enc.imm },
+                    0x5 => if cpu_flags & (Flags::N | Flags::Z) == (Flags::N | Flags::Z) { cpu.state.pc = enc.imm },
+                    0x6 => if cpu_flags & Flags::N != Flags::N { cpu.state.pc = enc.imm},
+                    0x7 => if cpu_flags & Flags::Z != Flags::Z { cpu.state.pc = enc.imm},
+                    0x8 => if cpu_flags & Flags::O == Flags::O { cpu.state.pc = enc.imm},
+                    0x9 => if cpu_flags & Flags::P == Flags::P { cpu.state.pc = enc.imm},
+                    0xA => if cpu_flags & (Flags::C | Flags::Z) != (Flags::C | Flags::Z) { cpu.state.pc = enc.imm },
+                    0xB => if cpu_flags & Flags::C != Flags::C { cpu.state.pc = enc.imm},
+                    0xC => if cpu_flags & (Flags::C | Flags::Z) == (Flags::C | Flags::Z) { cpu.state.pc = enc.imm },
+                    _ => println!("jmp jump_code error! invalid instruction."),
+                }
+
+
+
+
+            },
+            repr: |enc| { format!("jumped to {}", enc.imm) }, //looks ugly... TODO: do it better
+        });
+        
 
         m
     };
