@@ -41,13 +41,14 @@ impl Encoding {
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
-enum Opcode { 
+enum Opcode {
     NOP = 0x0,
     MOV = 0x1,
     LDD = 0x2,
     ADD = 0x7,
     ADI = 0x8,
     SUB = 0xA,
+    CAI = 0xB,
     CMP = 0xC,
     CMI = 0xD,
     JMP = 0xE,
@@ -62,6 +63,8 @@ enum Opcode {
     SHR = 0x1A,
     SLI = 0x23,
     SRI = 0x24,
+    SAR = 0x25,
+    SAI = 0x26,
     DIV = 0x1D,
     MUL = 0x1C,
     MOD = 0x2C,
@@ -125,7 +128,7 @@ lazy_static! {
             execute: |enc, cpu| { 
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 - cpu.state.reg[enc.rs2 as usize] as u32;
                 cpu.state.reg[enc.rd as usize] = _out as u16;
-                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs1 as usize] as u32, _out);
+                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
 
                 cpu.state.pc = cpu.state.pc+1;
             },
@@ -165,7 +168,7 @@ lazy_static! {
             execute: |enc, cpu| {
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 & enc.imm as u32;
                 cpu.state.reg[enc.rd as usize] = _out as u16;
-                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs1 as usize] as u32, _out);
+                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
 
                 cpu.state.pc = cpu.state.pc+1;
             },
@@ -225,7 +228,7 @@ lazy_static! {
             execute: |enc, cpu| {
                 let _out:u32 = cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32;
                 cpu.state.reg[enc.rd as usize] = _out as u16;
-                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs1 as usize] as u32, _out);
+                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
                 cpu.state.pc = cpu.state.pc+1; 
             },
             repr: |enc| format!("sri r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
@@ -254,7 +257,7 @@ lazy_static! {
         m.insert(Opcode::CMP as u8, Operation {
             execute: |enc, cpu| {
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 - cpu.state.reg[enc.rs2 as usize] as u32;
-                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs1 as usize] as u32, _out)
+                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out)
             },
             repr: |enc| format!("cmp r{}, r{}", enc.rs1, enc.rs2),
         });
@@ -322,7 +325,33 @@ lazy_static! {
                 }
                 format!("{} {}",jmp_code_str, enc.imm) },
         });
-        
+        m.insert(Opcode::CAI as u8, Operation {
+            execute: |enc, cpu| {
+                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 & enc.imm as u32;
+                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out)
+            },
+            repr: |enc| format!("cai r{}, r{}", enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::SAR as u8, Operation {
+            execute: |enc, cpu| {
+                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32) | (1 << 15);
+                cpu.state.reg[enc.rd as usize] = _out as u16;
+                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
+                cpu.state.pc = cpu.state.pc+1; 
+            },
+            repr: |enc| format!("sri r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+         });
+         m.insert(Opcode::SAI as u8, Operation {
+            execute: |enc, cpu| {
+                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32) | (1 << 15);
+                cpu.state.reg[enc.rd as usize] = _out as u16;
+                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
+                cpu.state.pc = cpu.state.pc+1; 
+            },
+            repr: |enc| format!("sri r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
+         });
+
+
 
         m
     };
