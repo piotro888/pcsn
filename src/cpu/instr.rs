@@ -103,8 +103,8 @@ lazy_static! {
         });
         m.insert(Opcode::ADD as u8, Operation {
             execute: |enc, cpu|{
-                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 + cpu.state.reg[enc.rs2 as usize] as u32; //this gives us acces to 17th bit
-                cpu.state.reg[enc.rd as usize] = _out as u16; // but the same value as before goes back to register
+                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 + cpu.state.reg[enc.rs2 as usize] as u32;
+                cpu.state.reg[enc.rd as usize] = _out as u16; 
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out); 
                 
                 cpu.state.pc = cpu.state.pc+1;
@@ -276,29 +276,26 @@ lazy_static! {
             execute: |enc, cpu| {
                 let jmp_code: u8 = ((enc.rs1 << 3) as u8) +  enc.rd as u8;
                 let cpu_flags: Flags = Flags::from_bits_truncate(cpu.state.flags);
-                let mut jump_condition_met: bool = false;
-
-                match jmp_code {
-                    0x0 => cpu.state.pc = enc.imm,
-                    0x1 => if cpu_flags.contains(Flags::C) { jump_condition_met = true },
-                    0x2 => if cpu_flags.contains(Flags::Z) { jump_condition_met = true },
-                    0x3 => if cpu_flags.contains(Flags::N) { jump_condition_met = true },
-                    0x4 => if !(cpu_flags.contains(Flags::N | Flags::Z)) { jump_condition_met = true },
-                    0x5 => if cpu_flags.contains(Flags::N | Flags::Z) { jump_condition_met = true },
-                    0x6 => if !(cpu_flags.contains(Flags::N)) { jump_condition_met = true },
-                    0x7 => if !(cpu_flags.contains(Flags::Z)) { jump_condition_met = true },
-                    0x8 => if cpu_flags.contains(Flags::O) { jump_condition_met = true },
-                    0x9 => if cpu_flags.contains(Flags::P) { jump_condition_met = true },
-                    0xA => if !(cpu_flags.contains(Flags::C | Flags::Z)) { jump_condition_met = true },
-                    0xB => if !(cpu_flags.contains(Flags::C)) { jump_condition_met = true },
-                    0xC => if !(cpu_flags.contains(Flags::C | Flags::Z)) { jump_condition_met = true },
-                    _ => println!("jmp jump_code error! invalid instruction."),
-                }
+                let jump_condition_met: bool = match jmp_code {
+                    0x0 => true,
+                    0x1 => cpu_flags.contains(Flags::C),
+                    0x2 => cpu_flags.contains(Flags::Z),
+                    0x3 => cpu_flags.contains(Flags::N),
+                    0x4 => !(cpu_flags.contains(Flags::N) | cpu_flags.contains(Flags::Z)),
+                    0x5 => cpu_flags.contains(Flags::N) | cpu_flags.contains(Flags::Z), 
+                    0x6 => !(cpu_flags.contains(Flags::N)),
+                    0x7 => !(cpu_flags.contains(Flags::Z)),
+                    0x8 => cpu_flags.contains(Flags::O),
+                    0x9 => cpu_flags.contains(Flags::P),
+                    0xA => !(cpu_flags.contains(Flags::C) | cpu_flags.contains(Flags::Z)),
+                    0xB => !(cpu_flags.contains(Flags::C)), 
+                    0xC => !(cpu_flags.contains(Flags::C) | cpu_flags.contains(Flags::Z)),
+                    _ => { println!("jmp jump_code error! invalid instruction."); false },
+                };
 
                 if jump_condition_met {
                     cpu.state.pc = enc.imm;
-                }
-                else {
+                } else {
                     cpu.state.pc = cpu.state.pc+1;
                 }
 
@@ -321,9 +318,9 @@ lazy_static! {
                     0xA => jmp_code_str = "jgtu",
                     0xB => jmp_code_str = "jgeu",
                     0xC => jmp_code_str = "jleu",
-                    _ => jmp_code_str = "jump error",
+                    _ => jmp_code_str = "jump_code error",
                 }
-                format!("{} to {}",jmp_code_str, enc.imm) }, //looks ugly... TODO: do it better
+                format!("{} {}",jmp_code_str, enc.imm) },
         });
         
 
@@ -341,7 +338,7 @@ pub fn execute(enc: &Encoding, cpu: &mut CPU) {
     (op.execute)(enc, cpu);
 }
 
-fn gen_flag(is_subtract: bool, var_1: u32, var_2: u32, mut var_out: u32) -> u16 {
+fn gen_flag(is_subtract: bool, var_1: u32, var_2: u32, var_out: u32) -> u16 {
     let mut temp_flag = Flags::empty();
     if extract(var_out, 15, 1) == 1 { temp_flag |= Flags::N; }
     
@@ -352,12 +349,18 @@ fn gen_flag(is_subtract: bool, var_1: u32, var_2: u32, mut var_out: u32) -> u16 
 
     if var_out as u16 == 0 { temp_flag |= Flags::Z; }
 
+    if var_out.count_ones() % 2 == 0 { temp_flag |= Flags::P; }
+
+    temp_flag.bits()
+
+
+}
+
+
+    /* wewy cvool code :pleeding_face:
     var_out ^= var_out >> 8;
     var_out ^= var_out >> 4;
     var_out ^= var_out >> 2;
     var_out ^= var_out >> 1;
     if extract(var_out, 0, 1) == 0 { temp_flag |= Flags::P; }
-
-    println!("{:?}", temp_flag);
-    temp_flag.bits()
-}
+    */
