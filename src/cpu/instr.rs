@@ -65,6 +65,7 @@ enum Opcode {
     SRI = 0x24,
     SAR = 0x25,
     SAI = 0x26,
+    SEX = 0x27,
     DIV = 0x1D,
     MUL = 0x1C,
     MOD = 0x2C,
@@ -350,6 +351,16 @@ lazy_static! {
             },
             repr: |enc| format!("sri r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
          });
+        m.insert(Opcode::SEX as u8, Operation {
+            execute: |enc, cpu|{
+                cpu.state.reg[enc.rd as usize] = match (cpu.state.reg[enc.rs1 as usize] >> 7) & 1 {
+                    0 => cpu.state.reg[enc.rs1 as usize],
+                    1 => cpu.state.reg[enc.rs1 as usize] | 0b1111111100000000, //not
+                };
+                cpu.state.pc = cpu.state.pc + 1; 
+            },
+            repr: |enc| format!("sex r{}", enc.rs1)
+        });
 
 
 
