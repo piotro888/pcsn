@@ -335,25 +335,33 @@ lazy_static! {
         });
         m.insert(Opcode::SAR as u8, Operation {
             execute: |enc, cpu| {
-                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32) | (0b1111111111111111 <<  (16  - cpu.state.reg[enc.rs2 as usize]));
+                let _out:u32 = match extract(cpu.state.reg[enc.rs1 as usize] as u32, 15, 1) {
+                    1 => (cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32) | (0b1111111111111111 <<  (16  - cpu.state.reg[enc.rs2 as usize])),
+                    _ => cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32,
+                };
+                
                 cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
                 cpu.state.pc = cpu.state.pc+1; 
             },
-            repr: |enc| format!("sri r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+            repr: |enc| format!("sar r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
          });
          m.insert(Opcode::SAI as u8, Operation {
             execute: |enc, cpu| {
-                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32) | (0b1111111111111111 << (16 - enc.imm)); 
-                cpu.state.reg[enc.rd as usize] = _out as u16;                               //u16 max value^^^
+                let _out:u32 = match extract(cpu.state.reg[enc.rs1 as usize] as u32, 15, 1) {
+                    1 => (cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32) | (0b1111111111111111 << (16 - enc.imm)),
+                    _ => cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32,
+                };
+                //
+                cpu.state.reg[enc.rd as usize] = _out as u16;                               
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
                 cpu.state.pc = cpu.state.pc+1; 
             },
-            repr: |enc| format!("sri r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
+            repr: |enc| format!("sai r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
          });
         m.insert(Opcode::SEX as u8, Operation {
             execute: |enc, cpu|{
-                cpu.state.reg[enc.rd as usize] = match (cpu.state.reg[enc.rs1 as usize] >> 7) & 1 {
+                cpu.state.reg[enc.rd as usize] = match extract(cpu.state.reg[enc.rs1 as usize] as u32, 7, 1) {
                     0 => cpu.state.reg[enc.rs1 as usize],
                     _ => cpu.state.reg[enc.rs1 as usize] | 0b1111111100000000,
                     //there is no edge cases. only one other outcome could be "1" but rust does not compile othetr way
