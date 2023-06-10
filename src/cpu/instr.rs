@@ -107,8 +107,8 @@ lazy_static! {
         });
         m.insert(Opcode::ADD as u8, Operation {
             execute: |enc, cpu|{
-                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 + cpu.state.reg[enc.rs2 as usize] as u32;
-                cpu.state.reg[enc.rd as usize] = _out as u16; 
+                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 + cpu.state.reg[enc.rs2 as usize] as u32; // this gives us acces to 17th bit
+                cpu.state.reg[enc.rd as usize] = _out as u16; // but the correct value goes back to register
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out); 
                 
                 cpu.state.pc = cpu.state.pc+1;
@@ -335,7 +335,7 @@ lazy_static! {
         });
         m.insert(Opcode::SAR as u8, Operation {
             execute: |enc, cpu| {
-                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32) | (1 << 15);
+                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32) | (0b1111111111111111 <<  (16  - cpu.state.reg[enc.rs2 as usize]));
                 cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
                 cpu.state.pc = cpu.state.pc+1; 
@@ -344,8 +344,8 @@ lazy_static! {
          });
          m.insert(Opcode::SAI as u8, Operation {
             execute: |enc, cpu| {
-                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32) | (1 << 15);
-                cpu.state.reg[enc.rd as usize] = _out as u16;
+                let _out:u32 = (cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32) | (0b1111111111111111 << (16 - enc.imm)); 
+                cpu.state.reg[enc.rd as usize] = _out as u16;                               //u16 max value^^^
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
                 cpu.state.pc = cpu.state.pc+1; 
             },
@@ -355,7 +355,8 @@ lazy_static! {
             execute: |enc, cpu|{
                 cpu.state.reg[enc.rd as usize] = match (cpu.state.reg[enc.rs1 as usize] >> 7) & 1 {
                     0 => cpu.state.reg[enc.rs1 as usize],
-                    1 => cpu.state.reg[enc.rs1 as usize] | 0b1111111100000000, //not
+                    _ => cpu.state.reg[enc.rs1 as usize] | 0b1111111100000000,
+                    //there is no edge cases. only one other outcome could be "1" but rust does not compile othetr way
                 };
                 cpu.state.pc = cpu.state.pc + 1; 
             },
