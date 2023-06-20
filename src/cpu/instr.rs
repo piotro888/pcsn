@@ -45,14 +45,21 @@ enum Opcode {
     NOP = 0x0,
     MOV = 0x1,
     LDD = 0x2,
+    LDO = 0x3,
+    LDI = 0x4,
+    STD = 0x5,
+    STO = 0x6,
     ADD = 0x7,
     ADI = 0x8,
+    ADC = 0x9,
     SUB = 0xA,
-    CAI = 0xB,
+    SUC = 0xB,
     CMP = 0xC,
     CMI = 0xD,
     JMP = 0xE,
     JAL = 0xF,
+    SRL = 0x10,
+    SRS = 0x11,
     AND = 0x13,
     ORR = 0x14,
     XOR = 0x15,
@@ -61,15 +68,19 @@ enum Opcode {
     XOI = 0x18,
     SHL = 0x19,
     SHR = 0x1A,
+    CAI = 0x1B,
+    MUL = 0x1C,
+    DIV = 0x1D,
+    LD8 = 0x1F,
+    LO8 = 0x20,
+    SD8 = 0x21,
+    SO8 = 0x22,
     SLI = 0x23,
     SRI = 0x24,
     SAR = 0x25,
     SAI = 0x26,
     SEX = 0x27,
-    DIV = 0x1D,
-    MUL = 0x1C,
     MOD = 0x2C,
-
 }
 
 struct Operation {
@@ -80,9 +91,9 @@ struct Operation {
 
 
 lazy_static! {
-    static ref OP_MAP : HashMap<u8, Operation> = {  
+    static ref OP_MAP : HashMap<u8, Operation> = {
         let mut m = HashMap::new();
-        
+
         m.insert(Opcode::NOP as u8, Operation {
             execute: |_enc, cpu| {
                 cpu.state.pc = cpu.state.pc+1;
@@ -92,7 +103,7 @@ lazy_static! {
         m.insert(Opcode::MOV as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.state.reg[enc.rs1 as usize];
-                
+
                 cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("mov r{}, r{}", enc.rd, enc.rs1),
@@ -100,17 +111,49 @@ lazy_static! {
         m.insert(Opcode::LDD as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.read(enc.imm, true);
-                
+
                 cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("ldd r{0}, {1}", enc.rd, enc.imm),
+        });
+        m.insert(Opcode::LDO as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.read(enc.imm + cpu.state.reg[enc.rs1 as usize], true);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("ldo r{}, r{}, {}", enc.rd, enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::LDI as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = enc.imm;
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("ldi r{}, {}", enc.rd, enc.imm),
+        });
+        m.insert(Opcode::STD as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.write(enc.imm, true, cpu.state.reg[enc.rs1 as usize]);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("std r{}, {}", enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::STO as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.write(enc.imm+cpu.state.reg[enc.rs2 as usize], true, cpu.state.reg[enc.rs1 as usize]);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("sto r{}, r{}, {}", enc.rs1, enc.rs2, enc.imm),
         });
         m.insert(Opcode::ADD as u8, Operation {
             execute: |enc, cpu|{
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 + cpu.state.reg[enc.rs2 as usize] as u32; // this gives us acces to 17th bit
                 cpu.state.reg[enc.rd as usize] = _out as u16; // but the correct value goes back to register
-                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out); 
-                
+                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
+
                 cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("add r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
@@ -125,8 +168,18 @@ lazy_static! {
             },
             repr: |enc| format!("adi r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
         });
+        m.insert(Opcode::ADC as u8, Operation {
+            execute: |enc, cpu|{
+                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 + cpu.state.reg[enc.rs2 as usize] as u32 + (Flags::from_bits_truncate(cpu.state.flags).contains(Flags::C) as u32);
+                cpu.state.reg[enc.rd as usize] = _out as u16;
+                cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("adc r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
         m.insert(Opcode::SUB as u8, Operation {
-            execute: |enc, cpu| { 
+            execute: |enc, cpu| {
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 - cpu.state.reg[enc.rs2 as usize] as u32;
                 cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
@@ -134,6 +187,16 @@ lazy_static! {
                 cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("sub r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
+        });
+        m.insert(Opcode::SUC as u8, Operation {
+            execute: |enc, cpu|{
+                let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 - cpu.state.reg[enc.rs2 as usize] as u32 - (Flags::from_bits_truncate(cpu.state.flags).contains(Flags::C) as u32);
+                cpu.state.reg[enc.rd as usize] = _out as u16;
+                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("suc r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
         });
         m.insert(Opcode::AND as u8, Operation {
             execute: |enc, cpu| {
@@ -195,9 +258,41 @@ lazy_static! {
             },
             repr: |enc| format!("xoi r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
         });
+        m.insert(Opcode::LD8 as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.read(enc.imm, false);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("ld8 r{0}, {1}", enc.rd, enc.imm),
+        });
+        m.insert(Opcode::LO8 as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.read(enc.imm + cpu.state.reg[enc.rs1 as usize], false);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("lo8 r{}, r{}, {}", enc.rd, enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::SD8 as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.write(enc.imm, false, cpu.state.reg[enc.rs1 as usize]);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("sd8 r{}, {}", enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::SO8 as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.write(enc.imm+cpu.state.reg[enc.rs2 as usize], false, cpu.state.reg[enc.rs1 as usize]);
+
+                cpu.state.pc = cpu.state.pc+1;
+            },
+            repr: |enc| format!("so8 r{}, r{}, {}", enc.rs1, enc.rs2, enc.imm),
+        });
         m.insert(Opcode::SHL as u8, Operation {
             execute: |enc, cpu| {
-                let _out: u32 = ((cpu.state.reg[enc.rs1 as usize] as u32) << (cpu.state.reg[enc.rs2 as usize] as u32)); // necessary parentheses  
+                let _out: u32 = (cpu.state.reg[enc.rs1 as usize] as u32) << (cpu.state.reg[enc.rs2 as usize] as u32);
                 cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
 
@@ -217,8 +312,8 @@ lazy_static! {
         });
         m.insert(Opcode::SLI as u8, Operation {
             execute: |enc, cpu| {
-                let _out: u32 = ((cpu.state.reg[enc.rs1 as usize] as u32) << (enc.imm as u32));// necessary parentheses
-                cpu.state.reg[enc.rd as usize] = _out as u16; 
+                let _out: u32 = (cpu.state.reg[enc.rs1 as usize] as u32) << (enc.imm as u32);
+                cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
 
                 cpu.state.pc = cpu.state.pc+1;
@@ -230,7 +325,7 @@ lazy_static! {
                 let _out:u32 = cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32;
                 cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
-                cpu.state.pc = cpu.state.pc+1; 
+                cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("sri r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
         });
@@ -258,7 +353,8 @@ lazy_static! {
         m.insert(Opcode::CMP as u8, Operation {
             execute: |enc, cpu| {
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 - cpu.state.reg[enc.rs2 as usize] as u32;
-                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out)
+                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
+                cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("cmp r{}, r{}", enc.rs1, enc.rs2),
         });
@@ -266,15 +362,17 @@ lazy_static! {
             execute: |enc, cpu| {
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 - enc.imm as u32;
                 cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
+                cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("cmp r{}, {}", enc.rs1, enc.imm),
         });
         m.insert(Opcode::JAL as u8, Operation {
             execute: |enc, cpu| {
                 cpu.state.reg[enc.rd as usize] = cpu.state.pc;
-                cpu.state.pc = enc.imm; 
+                cpu.state.pc = enc.imm;
+                cpu.sregs.jtr_trig();
             },
-            repr: |enc| format!("jal {} {}",enc.rd, enc.imm),
+            repr: |enc| format!("jal r{}, {}",enc.rd, enc.imm),
         });
         m.insert(Opcode::JMP as u8, Operation {
             execute: |enc, cpu| {
@@ -286,19 +384,20 @@ lazy_static! {
                     0x2 => cpu_flags.contains(Flags::Z),
                     0x3 => cpu_flags.contains(Flags::N),
                     0x4 => !(cpu_flags.contains(Flags::N) | cpu_flags.contains(Flags::Z)),
-                    0x5 => cpu_flags.contains(Flags::N) | cpu_flags.contains(Flags::Z), 
+                    0x5 => cpu_flags.contains(Flags::N) | cpu_flags.contains(Flags::Z),
                     0x6 => !(cpu_flags.contains(Flags::N)),
                     0x7 => !(cpu_flags.contains(Flags::Z)),
                     0x8 => cpu_flags.contains(Flags::O),
                     0x9 => cpu_flags.contains(Flags::P),
                     0xA => !(cpu_flags.contains(Flags::C) | cpu_flags.contains(Flags::Z)),
-                    0xB => !(cpu_flags.contains(Flags::C)), 
+                    0xB => !(cpu_flags.contains(Flags::C)),
                     0xC => !(cpu_flags.contains(Flags::C) | cpu_flags.contains(Flags::Z)),
                     _ => { println!("jmp jump_code error! invalid instruction."); false },
                 };
 
                 if jump_condition_met {
                     cpu.state.pc = enc.imm;
+                    cpu.sregs.jtr_trig();
                 } else {
                     cpu.state.pc = cpu.state.pc+1;
                 }
@@ -326,12 +425,27 @@ lazy_static! {
                 }
                 format!("{} {}",jmp_code_str, enc.imm) },
         });
+        m.insert(Opcode::SRL as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.state.reg[enc.rd as usize] = cpu.sregs.read(enc.imm, &cpu.state);
+                cpu.state.pc = cpu.state.pc + 1;
+            },
+            repr: |enc| format!("srl r{}, {}", enc.rs1, enc.imm),
+        });
+        m.insert(Opcode::SRS as u8, Operation {
+            execute: |enc, cpu| {
+                cpu.sregs.write(enc.imm, cpu.state.reg[enc.rs1 as usize], &mut cpu.state);
+                cpu.state.pc = cpu.state.pc + 1;
+            },
+            repr: |enc| format!("srs r{}, {}", enc.rs1, enc.imm),
+        });
         m.insert(Opcode::CAI as u8, Operation {
             execute: |enc, cpu| {
                 let _out: u32 = cpu.state.reg[enc.rs1 as usize] as u32 & enc.imm as u32;
-                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out)
+                cpu.state.flags = gen_flag(true, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
+                cpu.state.pc = cpu.state.pc+1;
             },
-            repr: |enc| format!("cai r{}, r{}", enc.rs1, enc.imm),
+            repr: |enc| format!("cai r{}, {}", enc.rs1, enc.imm),
         });
         m.insert(Opcode::SAR as u8, Operation {
             execute: |enc, cpu| {
@@ -339,10 +453,10 @@ lazy_static! {
                     1 => (cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32) | (0b1111111111111111 <<  (16  - cpu.state.reg[enc.rs2 as usize])),
                     _ => cpu.state.reg[enc.rs1 as usize] as u32 >> cpu.state.reg[enc.rs2 as usize] as u32,
                 };
-                
+
                 cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, cpu.state.reg[enc.rs2 as usize] as u32, _out);
-                cpu.state.pc = cpu.state.pc+1; 
+                cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("sar r{0}, r{1}, r{2}", enc.rd, enc.rs1, enc.rs2),
          });
@@ -353,9 +467,9 @@ lazy_static! {
                     _ => cpu.state.reg[enc.rs1 as usize] as u32 >> enc.imm as u32,
                 };
                 //
-                cpu.state.reg[enc.rd as usize] = _out as u16;                               
+                cpu.state.reg[enc.rd as usize] = _out as u16;
                 cpu.state.flags = gen_flag(false, cpu.state.reg[enc.rs1 as usize] as u32, enc.imm as u32, _out);
-                cpu.state.pc = cpu.state.pc+1; 
+                cpu.state.pc = cpu.state.pc+1;
             },
             repr: |enc| format!("sai r{0}, r{1}, {2}", enc.rd, enc.rs1, enc.imm),
          });
@@ -366,7 +480,7 @@ lazy_static! {
                     _ => cpu.state.reg[enc.rs1 as usize] | 0b1111111100000000,
                     //there is no edge cases. only one other outcome could be "1" but rust does not compile othetr way
                 };
-                cpu.state.pc = cpu.state.pc + 1; 
+                cpu.state.pc = cpu.state.pc + 1;
             },
             repr: |enc| format!("sex r{}", enc.rs1)
         });
@@ -383,33 +497,25 @@ pub fn execute(enc: &Encoding, cpu: &mut CPU) {
             println!("unknown operation {:?}", enc);
             OP_MAP.get(&(Opcode::NOP as u8)).unwrap()
     });
-    
+
+    print!("{}: ", cpu.state.pc);
+    println!("{}", ((op.repr)(enc)));
     (op.execute)(enc, cpu);
 }
 
 fn gen_flag(is_subtract: bool, var_1: u32, var_2: u32, var_out: u32) -> u16 {
     let mut temp_flag = Flags::empty();
     if extract(var_out, 15, 1) == 1 { temp_flag |= Flags::N; }
-    
+
     if extract(var_out, 16, 1) == 1 { temp_flag |= Flags::C; }
 
     if (extract(var_1, 15, 1) ^ extract(var_2, 15, 1) ^ (is_subtract as u32)) & (extract(var_1, 15, 1) ^ extract(var_out, 15, 1)) == 1 { temp_flag |= Flags::O; }
-    
+
 
     if var_out as u16 == 0 { temp_flag |= Flags::Z; }
 
     if var_out.count_ones() % 2 == 0 { temp_flag |= Flags::P; }
 
     temp_flag.bits()
-
-
 }
 
-
-    /* wewy cvool code :pleeding_face:
-    var_out ^= var_out >> 8;
-    var_out ^= var_out >> 4;
-    var_out ^= var_out >> 2;
-    var_out ^= var_out >> 1;
-    if extract(var_out, 0, 1) == 0 { temp_flag |= Flags::P; }
-    */
