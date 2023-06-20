@@ -15,7 +15,7 @@ impl Device for RAM {
             0b01 => { self.mem[addr as usize] = (self.mem[addr as usize]&0xff00) | data; }
             0b10 => { self.mem[addr as usize] = (self.mem[addr as usize]&0x00ff) | (data<<8); }
             0b11 => { self.mem[addr as usize] = data; }
-            _    => panic!("usupported sel bits: {sel}")
+            _    => panic!("unsupported sel bits: {sel}")
         }
     }
 }
@@ -28,7 +28,7 @@ impl RAM {
     pub fn load_at(&mut self, addr: u32, data: &[u8]) {
         let mut le_data = vec![0; data.len()/2];
         for (pos, ent) in le_data.iter_mut().enumerate() {
-            *ent = u16::from_le_bytes(data[pos*2..pos*2+1].try_into().unwrap())
+            *ent = u16::from_le_bytes([data[pos*2], data[pos*2+1]]);
         }
 
         self.mem[addr as usize..addr as usize+le_data.len()].copy_from_slice(&le_data);

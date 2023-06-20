@@ -50,8 +50,12 @@ impl Pty {
 
     pub fn spawn_term(&self) {
         Command::new("xterm")
+            .arg("-bg")
+            .arg("black")
+            .arg("-fg")
+            .arg("white")
             .arg("-e")
-            .arg(format!("python -m serial.tools.miniterm {}", self.slave_name))
+            .arg(format!("python -m serial.tools.miniterm --filter direct {}", self.slave_name))
             .spawn()
             .expect("Failed to spawn tty terminal");
     }

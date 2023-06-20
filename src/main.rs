@@ -1,3 +1,4 @@
+
 mod cpu;
 mod devices;
 mod support;
@@ -5,6 +6,9 @@ mod support;
 #[macro_use]
 extern crate lazy_static;
 
+
+use core::time;
+use std::thread;
 use std::fs::File;
 use std::io::Read;
 
@@ -12,30 +16,46 @@ use clap::Parser;
 
 use crate::devices::bus::{Bus, DeviceEntry, Device};
 use crate::devices::ram::RAM;
+use crate::devices::rom::ROM;
 use crate::devices::uart::UART;
+
+use crate::cpu::cpu::CPU;
 
 fn build_system(prog_init: &[u8], data_init: &[u8]) {
     let mut bus = Bus::new();
 
-    const RAM_START: u32 = 0x10_00000;
-    const RAM_END: u32   = 0xff_dffff;
+    const RAM_START: u32 = 0x10_0000;
+    const RAM_END: u32   = 0xff_dfff;
 
     let mut ram = RAM::with_size((RAM_END-RAM_START) as usize);
-    ram.load_at(0x10_00000-RAM_START, prog_init);
-    ram.load_at(0x80_00000-RAM_START, data_init);
-    bus.add_device(DeviceEntry {begin_addr: RAM_START, end_addr: 0xffdfff, device: Box::new(ram)});
+    ram.load_at(0x80_0000-RAM_START, prog_init);
+    ram.load_at(0x10_0800-RAM_START, data_init);
+    bus.add_device(DeviceEntry {begin_addr: RAM_START, end_addr: RAM_END, device: Box::new(ram)});
 
     let serial = UART::new();
     serial.pty.spawn_term();
     bus.add_device(DeviceEntry {begin_addr: 0x002000, end_addr: 0x002002, device: Box::new(serial)});
 
+    let boot_rom = ROM::new(&BOOTJUMP_ROM);
+    bus.add_device(DeviceEntry { device: Box::new(boot_rom), begin_addr: 0xff_e000, end_addr: 0xff_e005 });
+    thread::sleep(time::Duration::from_millis(100)); // TODO: wait for xterm lanuch to not miss serial out
+   
+    let mut cpu = CPU::new(bus, 0);
+    
+    println!("init done");
     loop {
-        if bus.read(0x002000, 0b11)&1 != 0 {
-            let rd = bus.read(0x002001, 0b11);
-            bus.write(0x002002, 0b11, rd);
-        }
+        cpu.tick();
     }
 }
+
+const BOOTJUMP_ROM: [u16; 6] = [
+     0x0004, // ldi r0, 0
+     0x0000,
+     0x0011, // srs r0, 2
+     0x0002,
+     0x000E, // jmp 0
+     0x0000,
+];
 
 #[derive(Parser)]
 struct CliArgs {

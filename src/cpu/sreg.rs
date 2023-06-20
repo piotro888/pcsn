@@ -62,7 +62,8 @@ impl SregCoreState {
     pub fn write(&mut self, addr: u16, data: u16, cpu_state: &mut State) {
         match SREG::n(addr) {
             Some(SREG::PC)  => {
-                cpu_state.pc = data; 
+                cpu_state.pc = data;
+                self.jtr_trig();
             }
             Some(SREG::PRIV) => {
                 if (self.sr1_priv & PRIV_PRIV) != 0 {
@@ -90,7 +91,7 @@ impl SregCoreState {
             self.immu[addr as usize - SREG::IMMU as usize] = data & ((1<<12)-1);
         }
         if addr >= SREG::DMMU as u16 && addr < SREG::DMMU as u16 + MMU_SIZE as u16 {
-            self.immu[addr as usize - SREG::DMMU as usize] = data & ((1<<13)-1);
+            self.dmmu[addr as usize - SREG::DMMU as usize] = data & ((1<<13)-1);
         }
     }
 
@@ -123,8 +124,8 @@ impl SregCoreState {
             return IMMU_DISABLED_MASK | addr as u32;  
         }
         let addr_low: u32 = (addr & ((1<<12)-1)) as u32;
-        let page: u32 = self.immu[(addr>>24) as usize] as u32;
-        (page<<12) | addr_low
+        let page: u32 = self.immu[(addr>>12) as usize] as u32;
+        (1<<23) | (page<<12) | addr_low
     }
 
     pub fn dmmu_translate(&self, addr: u16) -> u32 {
@@ -133,7 +134,8 @@ impl SregCoreState {
             return DMMU_DISABLED_MASK | addr as u32;  
         }
         let addr_low: u32 = (addr & ((1<<11)-1)) as u32;
-        let page: u32 = self.immu[(addr>>23) as usize] as u32;
+        let page: u32 = self.dmmu[(addr>>11) as usize] as u32;
+        println!("dmmu {:#06x} -> {:#08x}", addr, (page<<11)|addr_low);
         (page<<11) | addr_low
     }
 }

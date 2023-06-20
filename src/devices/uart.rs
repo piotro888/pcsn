@@ -17,6 +17,7 @@ const TX_ADDR: u32 = 0x2;
 impl Device for UART {
     fn write(&mut self, address: u32, _sel: u8, data: u16) {
         if address == TX_ADDR {
+            print!("txx{}", data as u8 as char);
             self.pty.master_write_file.write(&[data as u8]).unwrap();
         }
     }

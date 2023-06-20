@@ -34,12 +34,16 @@ impl Bus {
 
 impl Device for Bus {
     fn read(&mut self, address: u32, sel: u8) -> u16 {
+        print!("Bus read addr={:#08x}, sel={}", address, sel);
         let dev = self.find_device(address).unwrap(); // TODO: Support bus err respose in some
                                                       // cases and panic in others
-        dev.device.read(address-dev.begin_addr, sel)
+        let r = dev.device.read(address-dev.begin_addr, sel);
+        println!("  resp={:#05x}", r);
+        r
     }
-    
+     
     fn write(&mut self, address: u32, sel: u8, data: u16) {
+        println!("Bus write addr={:#08x}, sel={}, data={}", address, sel, data);
         let dev = self.find_device(address).unwrap();
         dev.device.write(address-dev.begin_addr, sel, data) 
     }
