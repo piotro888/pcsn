@@ -368,7 +368,7 @@ lazy_static! {
         });
         m.insert(Opcode::JAL as u8, Operation {
             execute: |enc, cpu| {
-                cpu.state.reg[enc.rd as usize] = cpu.state.pc;
+                cpu.state.reg[enc.rd as usize] = cpu.state.pc+1;
                 cpu.state.pc = enc.imm;
                 cpu.sregs.jtr_trig();
             },
@@ -435,7 +435,9 @@ lazy_static! {
         m.insert(Opcode::SRS as u8, Operation {
             execute: |enc, cpu| {
                 cpu.sregs.write(enc.imm, cpu.state.reg[enc.rs1 as usize], &mut cpu.state);
-                cpu.state.pc = cpu.state.pc + 1;
+                if enc.imm != crate::cpu::sreg::SREG::PC as u16 { // write to pc
+                    cpu.state.pc = cpu.state.pc + 1;
+                }
             },
             repr: |enc| format!("srs r{}, {}", enc.rs1, enc.imm),
         });

@@ -23,7 +23,7 @@ pub struct SregCoreState {
 #[allow(non_camel_case_types)]
 #[derive(enumn::N)]
 #[repr(u16)]
-enum SREG {
+pub enum SREG {
     PC = 0,
     PRIV,
     JTR,
