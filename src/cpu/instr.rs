@@ -60,6 +60,7 @@ enum Opcode {
     JAL = 0xF,
     SRL = 0x10,
     SRS = 0x11,
+    SYS = 0x12,
     AND = 0x13,
     ORR = 0x14,
     XOR = 0x15,
@@ -71,6 +72,7 @@ enum Opcode {
     CAI = 0x1B,
     MUL = 0x1C,
     DIV = 0x1D,
+    IRT = 0x1E,
     LD8 = 0x1F,
     LO8 = 0x20,
     SD8 = 0x21,
@@ -486,9 +488,18 @@ lazy_static! {
             },
             repr: |enc| format!("sex r{}", enc.rs1)
         });
-
-
-
+        m.insert(Opcode::SYS as u8, Operation {
+            execute: |_enc, cpu| {
+               cpu.sregs.add_interrupt(super::sreg::IRQF_SYS);
+            },
+            repr: |_enc| {String::from("sys")}
+        });
+        m.insert(Opcode::IRT as u8, Operation {
+            execute: |_enc, cpu| {
+                cpu.state.pc = cpu.sregs.irt();
+            },
+            repr: |_enc| {String::from("irt")}
+        });
         m
     };
 }

@@ -18,6 +18,8 @@ pub struct SregCoreState {
     immu: [u16; MMU_SIZE],
 
     coreid: u16,
+
+    _interrupt_causes: u16,
 }
 
 #[allow(non_camel_case_types)]
@@ -47,6 +49,10 @@ const PRIV_IRQ: u16   = 0b0100;
 
 const JTR_INSTPG: u16 = 0b001; 
 
+pub const IRQF_EXT: u16 = 1<<0;
+pub const IRQF_SYS: u16 = 1<<1;
+pub const IRQF_MEM: u16 = 1<<3;
+
 impl SregCoreState {
     pub fn new(coreid: u16) -> SregCoreState {
         SregCoreState {
@@ -55,7 +61,8 @@ impl SregCoreState {
             sr3_irq_pc: 0, sr5_irq_flags: 0, sr6_scratch: 0,
             immu: [0x7fe, 0x7ff, 0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             dmmu: [0; MMU_SIZE],
-            coreid
+            coreid,
+            _interrupt_causes: 0
         }
     }
 
@@ -137,6 +144,35 @@ impl SregCoreState {
         let page: u32 = self.dmmu[(addr>>11) as usize] as u32;
         println!("dmmu {:#06x} -> {:#08x}", addr, (page<<11)|addr_low);
         (page<<11) | addr_low
+    }
+    
+    pub fn add_interrupt(&mut self, cause: u16) {
+        self._interrupt_causes |= cause; 
+    }
+
+    pub fn interrupt(&mut self, state: &mut State) {
+        if self._interrupt_causes == 0 {
+            return;
+        }
+
+        self.sr1_priv = PRIV_PRIV;
+
+        self.sr2_jtr = JTR_INSTPG;
+        self.sr2_jtr_buff = JTR_INSTPG;
+
+        self.sr3_irq_pc = state.pc;
+
+        self.sr5_irq_flags = self._interrupt_causes;
+        self._interrupt_causes = 0;
+
+        state.pc = 0x1;
+    }
+
+    pub fn irt(&mut self) -> u16 {
+        self.sr1_priv |= PRIV_IRQ;
+        self.jtr_trig();
+
+        self.sr3_irq_pc
     }
 }
 

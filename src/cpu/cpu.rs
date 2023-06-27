@@ -66,6 +66,8 @@ impl CPU {
     pub fn tick(&mut self) {
         let insn = self.fetch();
         self.execute(insn);
+
+        self.sregs.interrupt(&mut self.state)
     }
 
     pub fn new(bus: Bus, coreid: u16) -> CPU {
