@@ -20,12 +20,13 @@ use crate::devices::bus::{Bus, DeviceEntry, Device};
 use crate::devices::irqc::Irqc;
 use crate::devices::ram::RAM;
 use crate::devices::rom::ROM;
+use crate::devices::sd::SD;
 use crate::devices::uart::UART;
 use crate::devices::timer::Timer;
 
 use crate::cpu::cpu::CPU;
 
-fn build_system(prog_init: &[u8], data_init: &[u8]) {
+fn build_system(prog_init: &[u8], data_init: &[u8], sd_file: File) {
     let mut bus = Bus::new();
 
     const RAM_START: u32 = 0x10_0000;
@@ -50,6 +51,9 @@ fn build_system(prog_init: &[u8], data_init: &[u8]) {
     let timer = Rc::new(RefCell::new(Timer{}));
     bus.add_device(DeviceEntry { device: Rc::clone(&timer) as Rc<RefCell<dyn Device>>, begin_addr: 0x002008, end_addr: 0x00200a });
     
+    let spi_sd = SD::new(sd_file);
+    bus.add_device(DeviceEntry { device: Rc::new(RefCell::new(spi_sd)) as Rc<RefCell<dyn Device>>, begin_addr: 0x002010, end_addr: 0x002014 });
+
     let mut cpu = CPU::new(bus, 0);
 
     println!("init done");
@@ -77,6 +81,8 @@ struct CliArgs {
     prog_bin_path: std::path::PathBuf,
     /// path of binary file with data (loaded to 0x100000)
     data_bin_path: std::path::PathBuf,
+    /// path of sd card image file
+    sd_img_path: std::path::PathBuf,
 }
 
 fn read_file(path: &std::path::PathBuf) -> Vec<u8> {
@@ -91,6 +97,7 @@ fn main() {
 
     let prog_buff = read_file(&args.prog_bin_path);
     let data_buff = read_file(&args.data_bin_path);
+    let sd_img = File::open(args.sd_img_path).expect("Failed to open SD image file");
 
-    build_system(&prog_buff, &data_buff);
+    build_system(&prog_buff, &data_buff, sd_img);
 }

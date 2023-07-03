@@ -24,10 +24,10 @@ impl CPU {
 
     }
 
-    pub fn read(&mut self, cpu_addr: u16, word: bool) -> u16 { 
+    pub fn read(&mut self, cpu_addr: u16, word: bool) -> u16 {
         let (wb_adr, wb_sel) = self.data_wb_addr(cpu_addr, word);
         let val = self.bus.read(wb_adr, wb_sel);
-        
+
         if word {
             val
         } else {
