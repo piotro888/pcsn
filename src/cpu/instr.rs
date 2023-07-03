@@ -393,7 +393,7 @@ lazy_static! {
                     0x9 => cpu_flags.contains(Flags::P),
                     0xA => !(cpu_flags.contains(Flags::C) | cpu_flags.contains(Flags::Z)),
                     0xB => !(cpu_flags.contains(Flags::C)),
-                    0xC => !(cpu_flags.contains(Flags::C) | cpu_flags.contains(Flags::Z)),
+                    0xC => cpu_flags.contains(Flags::C) | cpu_flags.contains(Flags::Z),
                     _ => { println!("jmp jump_code error! invalid instruction."); false },
                 };
 
@@ -491,6 +491,8 @@ lazy_static! {
         m.insert(Opcode::SYS as u8, Operation {
             execute: |_enc, cpu| {
                cpu.sregs.add_interrupt(super::sreg::IRQF_SYS);
+               cpu.state.pc = cpu.state.pc + 1; // pc must be incremetned to trigger interrupt
+                                                // "before" next instruction
             },
             repr: |_enc| {String::from("sys")}
         });
