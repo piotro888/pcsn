@@ -11,13 +11,17 @@ use core::time;
 use std::thread;
 use std::fs::File;
 use std::io::Read;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use clap::Parser;
 
 use crate::devices::bus::{Bus, DeviceEntry, Device};
+use crate::devices::irqc::Irqc;
 use crate::devices::ram::RAM;
 use crate::devices::rom::ROM;
 use crate::devices::uart::UART;
+use crate::devices::timer::Timer;
 
 use crate::cpu::cpu::CPU;
 
@@ -30,21 +34,31 @@ fn build_system(prog_init: &[u8], data_init: &[u8]) {
     let mut ram = RAM::with_size((RAM_END-RAM_START) as usize);
     ram.load_at(0x80_0000-RAM_START, prog_init);
     ram.load_at(0x10_0800-RAM_START, data_init);
-    bus.add_device(DeviceEntry {begin_addr: RAM_START, end_addr: RAM_END, device: Box::new(ram)});
+    bus.add_device(DeviceEntry {begin_addr: RAM_START, end_addr: RAM_END, device: Rc::new(RefCell::new(ram))});
 
     let serial = UART::new();
     serial.pty.spawn_term();
-    bus.add_device(DeviceEntry {begin_addr: 0x002000, end_addr: 0x002002, device: Box::new(serial)});
+    bus.add_device(DeviceEntry {begin_addr: 0x002000, end_addr: 0x002002, device: Rc::new(RefCell::new(serial))});
 
     let boot_rom = ROM::new(&BOOTJUMP_ROM);
-    bus.add_device(DeviceEntry { device: Box::new(boot_rom), begin_addr: 0xff_e000, end_addr: 0xff_e005 });
+    bus.add_device(DeviceEntry { device: Rc::new(RefCell::new(boot_rom)), begin_addr: 0xff_e000, end_addr: 0xff_e005 });
     thread::sleep(time::Duration::from_millis(100)); // TODO: wait for xterm lanuch to not miss serial out
-   
-    let mut cpu = CPU::new(bus, 0);
+
+    let irqc = Rc::new(RefCell::new(Irqc::new()));
+    bus.add_device(DeviceEntry { device: Rc::clone(&irqc) as Rc<RefCell<dyn Device>>, begin_addr: 0x00200c, end_addr: 0x00200e });
     
+    let timer = Rc::new(RefCell::new(Timer{}));
+    bus.add_device(DeviceEntry { device: Rc::clone(&timer) as Rc<RefCell<dyn Device>>, begin_addr: 0x002008, end_addr: 0x00200a });
+    
+    let mut cpu = CPU::new(bus, 0);
+
     println!("init done");
     loop {
         cpu.tick();
+        
+        if irqc.borrow().active() {
+            cpu.sregs.add_interrupt(cpu::sreg::IRQF_EXT);
+        }
     }
 }
 

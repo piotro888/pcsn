@@ -1,12 +1,15 @@
+use std::rc::Rc;
+use std::cell::RefCell;
+
 pub trait Device {
     fn read(&mut self, address: u32, sel: u8) -> u16;
     fn write(&mut self, address: u32, sel: u8, data: u16);
 }
 
 pub struct DeviceEntry {
-    pub device: Box<dyn Device>,
+    pub device: Rc<RefCell<dyn Device>>,
     pub begin_addr: u32,
-    pub end_addr: u32
+    pub end_addr: u32,
 }
 
 pub struct Bus {
@@ -37,7 +40,7 @@ impl Device for Bus {
         print!("Bus read addr={:#08x}, sel={}", address, sel);
         let dev = self.find_device(address).unwrap(); // TODO: Support bus err respose in some
                                                       // cases and panic in others
-        let r = dev.device.read(address-dev.begin_addr, sel);
+        let r = dev.device.borrow_mut().read(address-dev.begin_addr, sel);
         println!("  resp={:#05x}", r);
         r
     }
@@ -45,6 +48,6 @@ impl Device for Bus {
     fn write(&mut self, address: u32, sel: u8, data: u16) {
         println!("Bus write addr={:#08x}, sel={}, data={}", address, sel, data);
         let dev = self.find_device(address).unwrap();
-        dev.device.write(address-dev.begin_addr, sel, data) 
+        dev.device.borrow_mut().write(address-dev.begin_addr, sel, data) 
     }
 }

@@ -145,9 +145,12 @@ impl SregCoreState {
         println!("dmmu {:#06x} -> {:#08x}", addr, (page<<11)|addr_low);
         (page<<11) | addr_low
     }
-    
+
     pub fn add_interrupt(&mut self, cause: u16) {
-        self._interrupt_causes |= cause; 
+        if cause == IRQF_EXT && (self.sr1_priv & PRIV_IRQ == 0) {
+            return;
+        }
+        self._interrupt_causes |= cause;
     }
 
     pub fn interrupt(&mut self, state: &mut State) {
