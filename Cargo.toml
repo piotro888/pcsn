@@ -12,3 +12,4 @@ clap = { version = "4.3.0", features = ["derive"] }
 enumn = "0.1.8"
 lazy_static = "1.4.0"
 nix = "0.26.2"
+console = "0.15.7"

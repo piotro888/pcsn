@@ -1,7 +1,8 @@
-
+#![allow(unused)] //remove later!
 mod cpu;
 mod devices;
 mod support;
+mod deburgger;
 
 #[macro_use]
 extern crate lazy_static;
@@ -23,8 +24,10 @@ use crate::devices::rom::ROM;
 use crate::devices::sd::SD;
 use crate::devices::uart::UART;
 use crate::devices::timer::Timer;
+use crate::deburgger::debugger::StatesD;
 
 use crate::cpu::cpu::CPU;
+use crate::deburgger::debugger::Debugger;
 
 fn build_system(prog_init: &[u8], data_init: &[u8], sd_file: File) {
     let mut bus = Bus::new();
@@ -56,13 +59,17 @@ fn build_system(prog_init: &[u8], data_init: &[u8], sd_file: File) {
 
     let mut cpu = CPU::new(bus, 0);
 
+    let mut debug: Debugger<'_> = Debugger::new(&mut cpu);
+
     println!("init done");
-    loop {
-        cpu.tick();
+
+    //println!("deburger options: w - set watch, s - step mode, c - continuous(no debugger)");
+    println!("only watch mode is avilable at this time. press any key."); // sad truth :c
+
+    loop{ //thinking about moving entire loop to debuger function?
+
+        debug.debuger_tick(); //cpu.tick();    
         
-        if irqc.borrow().active() {
-            cpu.sregs.add_interrupt(cpu::sreg::IRQF_EXT);
-        }
     }
 }
 
@@ -98,6 +105,7 @@ fn main() {
     let prog_buff = read_file(&args.prog_bin_path);
     let data_buff = read_file(&args.data_bin_path);
     let sd_img = File::open(args.sd_img_path).expect("Failed to open SD image file");
+
 
     build_system(&prog_buff, &data_buff, sd_img);
 }
