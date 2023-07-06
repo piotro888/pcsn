@@ -1,4 +1,3 @@
-#![allow(unused)] //remove later!
 mod cpu;
 mod devices;
 mod support;
@@ -14,6 +13,7 @@ use std::fs::File;
 use std::io::Read;
 use std::rc::Rc;
 use std::cell::RefCell;
+use console::style;
 
 use clap::Parser;
 
@@ -24,7 +24,6 @@ use crate::devices::rom::ROM;
 use crate::devices::sd::SD;
 use crate::devices::uart::UART;
 use crate::devices::timer::Timer;
-use crate::deburgger::debugger::StatesD;
 
 use crate::cpu::cpu::CPU;
 use crate::deburgger::debugger::Debugger;
@@ -61,16 +60,11 @@ fn build_system(prog_init: &[u8], data_init: &[u8], sd_file: File) {
 
     let mut debug: Debugger<'_> = Debugger::new(&mut cpu);
 
-    println!("init done");
+    println!("{}", style("Init Done").green());
 
-    //println!("deburger options: w - set watch, s - step mode, c - continuous(no debugger)");
-    println!("only watch mode is avilable at this time. press any key."); // sad truth :c
+    println!("deburger options: w - set watch, s - step mode, c - continuous mode(debugger off, you cannot change it later!)");
 
-    loop{ //thinking about moving entire loop to debuger function?
-
-        debug.debuger_tick(); //cpu.tick();    
-        
-    }
+    debug.debuger_loop(); //cpu loop with working deburger 
 }
 
 const BOOTJUMP_ROM: [u16; 6] = [

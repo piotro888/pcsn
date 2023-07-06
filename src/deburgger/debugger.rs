@@ -1,4 +1,6 @@
-use console::*; //TODO: choose what i really need
+use console::Term;
+use console::style;
+
 use crate::cpu::cpu::CPU;
 
 #[derive(PartialEq, Eq)]
@@ -24,6 +26,44 @@ impl Debugger<'_>
     {
         Debugger { cpu: cpu, state: StatesD::Frozen, watch: 0, }
     }
+
+    pub fn debuger_loop(&mut self)
+    {
+        loop {        
+                match self.state {
+                StatesD::Continuous => self.do_a_cpu_tick(),
+                StatesD::Frozen => self.choose_state(),
+                StatesD::OnWatch => { self.do_a_cpu_tick(); if self.cpu.state.pc == self.watch { self.change_state_to(StatesD::Frozen); }; },
+                StatesD::Step => { self.do_a_cpu_tick(); self.state = StatesD::Frozen},
+            }
+        }
+    }
+
+    fn do_a_cpu_tick(&mut self)
+    {
+        self.cpu.tick();
+        /*      TODO: do something with this scary looking thing below
+            if irqc.borrow().active() {
+                self.cpu.sregs.add_interrupt(cpu::sreg::IRQF_EXT);
+            }
+        */
+    }
+
+    fn choose_state(&mut self)
+    {                
+        //user input handler here:
+        let term = Term::stdout();
+        let state_char: char = term.read_char().unwrap();
+                                //                    ^^^ koniec kariery
+
+        match state_char {
+            's' => self.change_state_to(StatesD::Step), 
+            'w' => self.change_state_to(StatesD::OnWatch),
+            'c' => self.change_state_to(StatesD::Continuous),
+            _ => println!("unknown / no command"),
+        }
+
+    }
     
     fn change_state_to(&mut self, state_i: StatesD )
     {
@@ -36,48 +76,6 @@ impl Debugger<'_>
             self.watch = (term.read_line().unwrap()).parse::<u16>().expect("piotr wawrzyniak a nie u16"); //reading line and converting it to u16. kind of unsafe. for now...
         }
         println!("deburger mode: {:?}", style(self.state).cyan());
-    } 
-    
-    pub fn check_watch(&mut self)
-    {
-        //if field from cpu = watch, then
-        if self.watch == self.cpu.state.pc {
-            self.state = StatesD::Frozen;
-        }
-    }
-
-    pub fn debuger_tick(&mut self)
-    {
-            match self.state {
-            StatesD::Continuous => self.cpu.tick(),
-            StatesD::Frozen => self.choose_state(),
-            StatesD::OnWatch => { if self.cpu.state.pc == self.watch { self.state = StatesD::Frozen }; self.cpu.tick(); },
-            StatesD::Step => { self.cpu.tick(); self.state = StatesD::Frozen},
-            _ => panic!(),  //lol imposible to get that.
-        }
-        
-        /*      TODO: do something with this scary looking thing below
-        if irqc.borrow().active() {
-            self.cpu.sregs.add_interrupt(cpu::sreg::IRQF_EXT);
-        }
-        */
-        
-    }
-
-    pub fn choose_state(&mut self)
-    {                
-        //user input handler here:
-        let term = Term::stdout();
-        let mut state_char: char = term.read_char().unwrap();
-        println!("{}", state_char); //debug line       ^^^ koniec kariery
-
-        match state_char {//for some reason deburger only works on mode that is on the line below. to test other modes you have to change StatesD::___ to desired mode.
-            s => self.change_state_to(StatesD::OnWatch), //change later to "Step"!!!
-            w => self.change_state_to(StatesD::OnWatch),
-            c => self.change_state_to(StatesD::Continuous),
-            _ => panic!() //println!("unknown / no command, C mode activated."),
-        }//        ^ only for the bug seeking :)
-
     }
     
 }
