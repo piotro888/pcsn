@@ -62,8 +62,6 @@ fn build_system(prog_init: &[u8], data_init: &[u8], sd_file: File) {
 
     println!("{}", style("Init Done").green());
 
-    println!("deburger options: w - set watch, s - step mode, c - continuous mode(debugger off, you cannot change it later!)");
-
     debug.debuger_loop(); //cpu loop with working deburger 
 }
 
