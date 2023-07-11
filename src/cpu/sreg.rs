@@ -160,8 +160,8 @@ impl SregCoreState {
 
         self.sr1_priv = PRIV_PRIV;
 
-        self.sr2_jtr = JTR_INSTPG;
-        self.sr2_jtr_buff = JTR_INSTPG;
+        self.sr2_jtr = 0;
+        self.sr2_jtr_buff = 0;
 
         self.sr3_irq_pc = state.pc;
 
